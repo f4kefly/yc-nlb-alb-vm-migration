@@ -6,8 +6,10 @@
 # Specify the following settings:
 locals {
   # The following settings are to be specified by the user. Change them as you wish.
-  domain_name = "ilovetestdocs.ru" # Domain name of your service
-  network_id  = "enpols3n07b8p7ijtggl"     # ID of the network where the VMs are located
+  domain_name = "" # Domain name of your service
+  network_id  = "" # ID of the network where the VMs are located
+  certificate = "" # Path to a file with a certificate
+  private_key = "" # Path to a file with a private key
 
   # The following settings are predefined. Change them only if necessary.
   network_name        = "alb-network"        # Network name
@@ -23,8 +25,10 @@ locals {
   host_name           = "alb-host"           # Virtual host name
   route_name          = "alb-route"          # Route name
   alb_name            = "alb"                # Application Load Balancer name
-  listener_name       = "alb-listener"       # Listener name
+  listener_http_name  = "alb-listener-http"  # HTTP protocol listener name
+  listener_https_name = "alb-listener-https" # HTTPS protocol listener name
   sws_profile_name    = "sws-profile"        # Security profile name
+  cert_name           = "user-certificate"   # User certificate name
 }
 
 # Network infrastructure
@@ -97,6 +101,18 @@ resource "yandex_vpc_address" "static-address" {
   }
 }
 
+# Infrastructure for the Certificate Manager
+
+resource "yandex_cm_certificate" "user-certificate" {
+  description = "Custom TLS сertificate"
+  name        = local.cert_name
+
+  self_managed {
+    certificate = file(local.certificate)
+    private_key = file(local.private_key)
+  }
+}
+
 # Infrastructure for the Smart Web Security
 
 resource "yandex_sws_security_profile" "sws-profile" {
@@ -123,12 +139,16 @@ resource "yandex_alb_target_group" "alb-target-group" {
   name        = local.target_group_name
 
   target {
-    subnet_id  = var.prereq_subnet_id
-    ip_address = yandex_compute_instance.nlb-vm[0].network_interface[0].ip_address
+    subnet_id  = "<идентификатор_подсети>"
+    ip_address = "<внутренний_IP-адрес_ВМ_1>"
   }
   target {
-    subnet_id  = var.prereq_subnet_id
-    ip_address = yandex_compute_instance.nlb-vm[1].network_interface[0].ip_address
+    subnet_id  = "<идентификатор_подсети>"
+    ip_address = "<внутренний_IP-адрес_ВМ_2>"
+  }
+  target {
+    subnet_id  = "<идентификатор_подсети>"
+    ip_address = "<внутренний_IP-адрес_ВМ_N>"
   }
 }
 
@@ -210,19 +230,28 @@ resource "yandex_alb_load_balancer" "alb" {
     }
   }
 
+    http {
+      redirects {
+        http_to_https = true
+      }
+    }
+  }
+
   listener {
-    name = local.listener_name
+    name = local.listener_https_name
     endpoint {
       address {
         external_ipv4_address {
-          address = "89.169.141.126" # Публичный IP-адрес, ранее принадлежавший сетевому балансировщику
+          address = yandex_vpc_address.static-address.external_ipv4_address[0].address
         }
       }
-      ports = [80]
+      ports = [443]
     }
-    http {
-      handler {
-        http_router_id = yandex_alb_http_router.alb-router.id
+    tls {
+      default_handler {
+        certificate_ids = [yandex_cm_certificate.user-certificate.id]
+        http_handler {
+          http_router_id = yandex_alb_http_router.alb-router.id
       }
     }
   }

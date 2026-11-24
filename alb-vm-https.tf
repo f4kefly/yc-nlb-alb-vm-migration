@@ -230,6 +230,16 @@ resource "yandex_alb_load_balancer" "alb" {
     }
   }
 
+  listener {
+    name = local.listener_http_name
+    endpoint {
+      address {
+        external_ipv4_address {
+          address = yandex_vpc_address.static-address.external_ipv4_address[0].address
+        }
+      }
+      ports = [80]
+    }
     http {
       redirects {
         http_to_https = true
@@ -252,6 +262,7 @@ resource "yandex_alb_load_balancer" "alb" {
         certificate_ids = [yandex_cm_certificate.user-certificate.id]
         http_handler {
           http_router_id = yandex_alb_http_router.alb-router.id
+        }
       }
     }
   }

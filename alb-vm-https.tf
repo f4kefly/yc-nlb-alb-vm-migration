@@ -119,7 +119,7 @@ resource "yandex_sws_security_profile" "sws-profile" {
   description             = "Security profile for the Application Load Balancer"
   name                    = local.sws_profile_name
   default_action          = "ALLOW"
-  disallow_data_processing = false
+  disallow_data_processing = true
 
   security_rule {
     description = "Smart protection is enabled in full mode"
